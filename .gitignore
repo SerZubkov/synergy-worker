@@ -14,3 +14,6 @@ frontend/
 .DS_Store
 
 .env
+
+# Локальный список сотрудников (консоль)
+data/workers.tsv

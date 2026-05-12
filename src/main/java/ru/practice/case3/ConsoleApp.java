@@ -1,12 +1,15 @@
 package ru.practice.case3;
 
+import ru.practice.case3.data.WorkerFileStorage;
 import ru.practice.case3.input.PositionPicker;
 import ru.practice.case3.model.Worker;
 import ru.practice.case3.validation.WorkerInputValidator;
 
 import ru.practice.case3.util.RuInputFormats;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -21,11 +24,13 @@ public final class ConsoleApp {
     }
 
     public static void main(String[] args) {
+        Path storePath = WorkerFileStorage.defaultPath();
+        List<Worker> workers = WorkerFileStorage.loadOrSeed(storePath);
+
+        System.out.println("=== Учёт работников: " + PRACTICE_ORG + " ===");
+        System.out.println("Сотрудников в списке: " + workers.size() + ". Файл данных: " + storePath.toAbsolutePath());
+
         try (Scanner in = new Scanner(System.in)) {
-            List<Worker> workers = new ArrayList<>();
-
-            System.out.println("=== Учёт работников: " + PRACTICE_ORG + " ===");
-
             boolean running = true;
             while (running) {
                 printMenu();
@@ -39,6 +44,12 @@ public final class ConsoleApp {
                 }
             }
             System.out.println("Выход.");
+        } finally {
+            try {
+                WorkerFileStorage.writeAll(storePath, workers);
+            } catch (IOException e) {
+                System.err.println("Не удалось сохранить список в файл: " + e.getMessage());
+            }
         }
     }
 
