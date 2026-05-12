@@ -1,9 +1,14 @@
 package ru.practice.case3;
 
+import ru.practice.case3.input.PositionPicker;
 import ru.practice.case3.model.Worker;
 import ru.practice.case3.validation.WorkerInputValidator;
 
+import ru.practice.case3.util.RuInputFormats;
+
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -20,7 +25,6 @@ public final class ConsoleApp {
             List<Worker> workers = new ArrayList<>();
 
             System.out.println("=== Учёт работников: " + PRACTICE_ORG + " ===");
-            System.out.println("Кейс 3: ввод WORKER, фильтр по стажу.");
 
             boolean running = true;
             while (running) {
@@ -47,27 +51,92 @@ public final class ConsoleApp {
         System.out.print("> ");
     }
 
-    private static void readWorkerFromKeyboard(Scanner in, List<Worker> workers) {
-        try {
-            System.out.print("Фамилия и инициалы: ");
-            String fio = in.nextLine().trim();
-            System.out.print("Должность: ");
-            String pos = in.nextLine().trim();
-            System.out.print("Зарплата (число): ");
-            BigDecimal sal = new BigDecimal(in.nextLine().trim().replace(',', '.'));
-            System.out.print("Год поступления на работу: ");
-            int year = Integer.parseInt(in.nextLine().trim());
+    /** Повторяет запрос, пока строка не будет непустой (без одних пробелов). */
+    private static String readNonBlank(Scanner in, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = in.nextLine().trim();
+            if (!line.isBlank()) {
+                return line;
+            }
+            System.out.println("Пустой ввод недопустим — введите значение.");
+        }
+    }
 
-            WorkerInputValidator.validateNewWorker(fio, pos, sal, year);
-            Worker w = new Worker(fio, pos, sal, year);
-            workers.add(w);
-            System.out.println("Добавлено: " + w.getLastNameAndInitials());
-        } catch (NumberFormatException e) {
-            System.out.println("Год и зарплату вводите числами.");
-        } catch (IllegalArgumentException e) {
-            System.out.println(e.getMessage());
-        } catch (Exception e) {
-            System.out.println("Ошибка ввода: " + e.getMessage());
+    private static BigDecimal readBigDecimal(Scanner in, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = in.nextLine().trim();
+            if (line.isBlank()) {
+                System.out.println("Зарплата не может быть пустой — введите число.");
+                continue;
+            }
+            try {
+                return RuInputFormats.parseMoney(line);
+            } catch (NumberFormatException e) {
+                System.out.println("Нужно число, например 75000 или 75000,5.");
+            }
+        }
+    }
+
+    private static int readInt(Scanner in, String prompt, String emptyMessage) {
+        while (true) {
+            System.out.print(prompt);
+            String line = in.nextLine().trim();
+            if (line.isBlank()) {
+                System.out.println(emptyMessage);
+                continue;
+            }
+            try {
+                return Integer.parseInt(line);
+            } catch (NumberFormatException e) {
+                System.out.println("Нужно целое число.");
+            }
+        }
+    }
+
+    private static LocalDate readLocalDate(Scanner in, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = in.nextLine().trim();
+            if (line.isBlank()) {
+                System.out.println("Дата не может быть пустой — введите дд.мм.гггг.");
+                continue;
+            }
+            try {
+                return RuInputFormats.parseDateDmy(line);
+            } catch (DateTimeParseException e) {
+                System.out.println("Формат: дд.мм.гггг (например 15.03.1990).");
+            }
+        }
+    }
+
+    static void readWorkerFromKeyboard(Scanner in, List<Worker> workers) {
+        while (true) {
+            try {
+                String fio = readNonBlank(in, "Фамилия и инициалы: ");
+                String pos = PositionPicker.readPosition(in);
+                BigDecimal sal = readBigDecimal(in, "Зарплата (число): ");
+
+                LocalDate birth = readLocalDate(in, "Дата рождения (дд.мм.гггг): ");
+                LocalDate actualStart = readLocalDate(
+                        in, "Дата фактического выхода на работу (дд.мм.гггг): ");
+
+                WorkerInputValidator.validateActualStartDate(actualStart);
+                WorkerInputValidator.validateAgeAtStart(birth, actualStart);
+
+                WorkerInputValidator.validateNewWorker(fio, pos, sal, birth, actualStart);
+                Worker w = new Worker(fio, pos, sal, birth, actualStart);
+                workers.add(w);
+                System.out.println("Добавлено: " + w.getLastNameAndInitials());
+                return;
+            } catch (IllegalArgumentException e) {
+                System.out.println(e.getMessage());
+                System.out.println("Введите данные работника заново (с фамилии и инициалов).");
+            } catch (Exception e) {
+                System.out.println("Ошибка ввода: " + e.getMessage());
+                System.out.println("Введите данные работника заново (с фамилии и инициалов).");
+            }
         }
     }
 
@@ -81,34 +150,38 @@ public final class ConsoleApp {
         }
     }
 
-    private static void filterByExperience(Scanner in, List<Worker> workers) {
+    static void filterByExperience(Scanner in, List<Worker> workers) {
         if (workers.isEmpty()) {
             System.out.println("Нет ни одного работника в списке.");
             return;
         }
-        try {
-            System.out.print("Порог стажа в годах (кого показать — только с стажем больше): ");
-            int threshold = Integer.parseInt(in.nextLine().trim());
-            WorkerInputValidator.validateExperienceThreshold(threshold);
-            int yearNow = java.time.Year.now().getValue();
-            List<Worker> found = new ArrayList<>();
-            for (Worker w : workers) {
-                if (w.isExperienceExceeding(threshold, yearNow)) {
-                    found.add(w);
+        while (true) {
+            try {
+                int threshold = readInt(
+                        in,
+                        "Порог стажа в годах (кого показать — только с стажем больше): ",
+                        "Порог не может быть пустым — введите число лет.");
+                WorkerInputValidator.validateExperienceThreshold(threshold);
+                int yearNow = java.time.Year.now().getValue();
+                List<Worker> found = new ArrayList<>();
+                for (Worker w : workers) {
+                    if (w.isExperienceExceeding(threshold, yearNow)) {
+                        found.add(w);
+                    }
                 }
-            }
-            if (found.isEmpty()) {
-                System.out.println("Работников, чей стаж превышает введённое значение, нет.");
-            } else {
-                System.out.println("Фамилии (стаж больше " + threshold + " лет):");
-                for (Worker w : found) {
-                    System.out.println("  • " + w.getSurname());
+                if (found.isEmpty()) {
+                    System.out.println("Работников, чей стаж превышает введённое значение, нет.");
+                } else {
+                    System.out.println("Фамилии (стаж больше " + threshold + " лет):");
+                    for (Worker w : found) {
+                        System.out.println("  • " + w.getSurname());
+                    }
                 }
+                return;
+            } catch (IllegalArgumentException e) {
+                System.out.println(e.getMessage());
+                System.out.println("Введите порог ещё раз.");
             }
-        } catch (NumberFormatException e) {
-            System.out.println("Нужно целое число лет.");
-        } catch (IllegalArgumentException e) {
-            System.out.println(e.getMessage());
         }
     }
 }

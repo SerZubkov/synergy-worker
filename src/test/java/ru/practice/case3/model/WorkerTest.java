@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.Year;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,21 +40,35 @@ class WorkerTest {
     @Test
     void changeAllFields() {
         Worker w = new Worker();
-        w.changeAllFields("Сидоров С.С.", "Кладовщик", new BigDecimal("55000"), 2021);
+        w.changeAllFields(
+                "Сидоров С.С.",
+                StaffRole.DESIGNER.getPositionTitle(),
+                new BigDecimal("55000"),
+                LocalDate.of(1995, 2, 2),
+                LocalDate.of(2021, 3, 1)
+        );
         assertEquals("Сидоров С.С.", w.getLastNameAndInitials());
-        assertEquals("Кладовщик", w.getPosition());
+        assertEquals(StaffRole.DESIGNER.getPositionTitle(), w.getPosition());
         assertEquals(new BigDecimal("55000"), w.getSalary());
         assertEquals(2021, w.getHireYear());
+        assertEquals(LocalDate.of(1995, 2, 2), w.getBirthDate());
+        assertEquals(LocalDate.of(2021, 3, 1), w.getActualStartDate());
     }
 
     @Test
     void display() {
-        Worker w = new Worker("А А.А.", "Стажёр", new BigDecimal("1"), 2025);
+        Worker w = new Worker(
+                "А А.А.",
+                StaffRole.FRONTEND.getPositionTitle(),
+                new BigDecimal("1"),
+                LocalDate.of(2003, 1, 1),
+                LocalDate.of(2025, 1, 1)
+        );
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         w.display(new PrintStream(buf, true, StandardCharsets.UTF_8));
         String line = buf.toString(StandardCharsets.UTF_8).trim();
         assertTrue(line.contains("А А.А."));
-        assertTrue(line.contains("Стажёр"));
+        assertTrue(line.contains(StaffRole.FRONTEND.getPositionTitle()));
         assertTrue(line.contains("руб."));
         assertTrue(line.contains("2025"));
     }
@@ -67,6 +82,19 @@ class WorkerTest {
         assertTrue(s.contains("50000"));
         assertTrue(s.contains("2020"));
         assertTrue(s.contains("стаж"));
+    }
+
+    @Test
+    void full_constructor_hire_year_from_actual_start() {
+        Worker w = new Worker(
+                "П П.П.",
+                "Тест",
+                BigDecimal.TEN,
+                LocalDate.of(1990, 6, 15),
+                LocalDate.of(2024, 3, 20)
+        );
+        assertEquals(2024, w.getHireYear());
+        assertEquals(LocalDate.of(2024, 3, 20), w.getActualStartDate());
     }
 
     @Test
